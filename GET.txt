@@ -1,0 +1,18 @@
+GET
+localhost:8000/api/artefacto/read
+
+POST
+localhost:8000/api/artefacto
+
+{
+        "id": 2,
+        "idCliente": 2,
+        "serie": "Serie2",
+        "marca": "Marca2",
+        "modelo": "19.30",
+        "categoria": "21",
+        "descripcion": "1.72"
+    }
+
+FILTRAR:
+http://localhost:8000/api/socios/filtrar?nombre=Tristan
