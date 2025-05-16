@@ -1,0 +1,72 @@
+USE biblio;
+SET GLOBAL log_bin_trust_function_creators = 1;
+DELIMITER $$
+
+DROP FUNCTION IF EXISTS cadenaFiltro$$
+CREATE FUNCTION cadenaFiltro(
+    valores VARCHAR(1000), 
+    columnas VARCHAR(1000)
+) RETURNS TEXT
+DETERMINISTIC
+BEGIN
+    DECLARE valor TEXT;
+    DECLARE columna TEXT;
+    DECLARE filtro TEXT DEFAULT '';
+    DECLARE i INT DEFAULT 1;
+
+    -- Número de filtros (asume misma cantidad que columnas)
+    DECLARE total INT DEFAULT 1 + LENGTH(valores) - LENGTH(REPLACE(valores, '&', ''));
+
+    WHILE i <= total DO
+        SET valor = SUBSTRING_INDEX(SUBSTRING_INDEX(valores, '&', i), '&', -1);
+        SET columna = SUBSTRING_INDEX(SUBSTRING_INDEX(columnas, '&', i), '&', -1);
+        
+        -- Añadir solo si hay un nombre de columna válido
+        IF columna IS NOT NULL AND columna != '' THEN
+            SET filtro = CONCAT(filtro, columna, ' LIKE "', valor, '" AND ');
+        END IF;
+        
+        SET i = i + 1;
+    END WHILE;
+
+    -- Eliminar el último " AND "
+    IF LENGTH(filtro) > 5 THEN
+        SET filtro = LEFT(filtro, LENGTH(filtro) - 5);
+    END IF;
+
+    RETURN filtro;
+END$$
+
+DELIMITER ;
+
+
+DROP PROCEDURE IF EXISTS filtrarSocios$$
+
+CREATE PROCEDURE filtrarSocios (
+    _parametros VARCHAR(255), -- Ejemplo: %3033%&%Adrian%&%%%%%%%
+    _pagina SMALLINT UNSIGNED, 
+    _cantRegs SMALLINT UNSIGNED
+)
+BEGIN
+    -- Generar la cláusula WHERE dinámicamente
+    SELECT cadenaFiltro(
+        _parametros, 
+        'cedula&nombre&fecha_ingreso&telefono&celular&genero&correo&direccion'
+    ) INTO @filtro;
+
+    -- Armar la consulta SQL con paginación
+    SELECT CONCAT(
+        "SELECT * FROM socios WHERE ", 
+        @filtro, 
+        " LIMIT ", 
+        (_pagina - 1) * _cantRegs, ", ", 
+        _cantRegs
+    ) INTO @sql;
+
+    -- Ejecutar la consulta
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+END$$
+
+DELIMITER ;
